@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Claude Read Aloud",
+  "version": "2.3.0",
+  "description": "Reads Claude's replies (or any selected text) aloud with live sentence and word highlighting.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "contextMenus"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Claude Read Aloud"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "commands": {
+    "toggle-reading": {
+      "suggested_key": {
+        "default": "Alt+Shift+R"
+      },
+      "description": "Read selection / play / pause"
+    },
+    "stop-reading": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Stop reading"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

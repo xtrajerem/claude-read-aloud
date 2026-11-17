@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8">
+<style>
+  body{font:13px system-ui;width:250px;padding:12px;margin:0;background:#262624;color:#eee}
+  h3{margin:0 0 8px;font-size:14px}
+  button{display:block;width:100%;margin:6px 0;padding:7px 10px;border:0;border-radius:8px;background:#3a3938;color:#fff;cursor:pointer;font:13px system-ui;text-align:left}
+  button:hover{background:#4a4947}
+  p{color:#aaa;font-size:12px;margin:10px 0 0;line-height:1.4}
+  #err{color:#ff9b8a}
+</style>
+<h3>Claude Read Aloud</h3>
+<button id="read">▶ Read selection / play-pause</button>
+<button id="stop">⏹ Stop</button>
+<button id="site">…</button>
+<button id="settings">⚙ Open settings on this page</button>
+<p>Shortcuts: <b>⌥⇧R</b> play/pause, <b>⌥⇧S</b> stop. Right-click a selection → <i>Read aloud</i>.</p>
+<p id="err"></p>
+<script src="popup.js"></script>
