@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.0
+- Clickable language badge in the player: correct a wrong detection mid-read, or force a language per site.
+- Settings sub-page **Voices per language**: narrator picker and preview for every detected language, add a language, manage per-site forced languages. Replaces the single French voice setting (migrated automatically).
+- Irish added to the fallback detector; stop-word matching now uses Unicode word boundaries.
+
 ## 2.3.0
 - Automatic language detection (Chromium CLD + FR/EN stop-word fallback), per section and per long paragraph.
 - Voice switching per language: pinned or auto-picked French (France) Natural voice; best Natural voice for other languages; Multilingual default voices kept.

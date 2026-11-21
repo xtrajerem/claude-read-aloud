@@ -115,6 +115,42 @@ with sync_playwright() as p:
     check("English paragraph uses the default voice", en and en[0].startswith("Christopher"), log)
     pg.close()
 
+    # --- Irish detection, manual language override, per-language narrators -----------
+    pg = open_page(b, "irish.html")
+    click_heading(pg, "h1")
+    pg.evaluate("speechSynthesis.end()")  # past the title, into the first paragraph
+    badge = shadow(pg, "lang", "e.textContent")
+    log = pg.evaluate("__log.slice()")
+    check("Irish text detected (fallback detector)", badge.startswith("GA"), badge)
+    check("Irish text read by an Irish voice", any(l.startswith("Orla") or l.startswith("Colm") for l in log), log)
+
+    pg.click("#cra-host >> css=#lang"); pg.wait_for_timeout(100)
+    check("badge opens language menu", shadow(pg, "langMenu", "!e.hidden"))
+    pg.screenshot(path=str(OUT / "language-menu.png"))
+    items = shadow(pg, "langMenu", "[...e.querySelectorAll('.it')].map(x => x.textContent)")
+    check("menu lists Auto + languages", items[0].startswith("Auto") and "French" in items and "Irish" in items, items)
+    pg.evaluate("document.getElementById('cra-host').shadowRoot.querySelectorAll('#langMenu .it').forEach(x => { if (x.textContent === 'French') x.click(); })")
+    pg.wait_for_timeout(150)
+    last = pg.evaluate("__log[__log.length - 1]")
+    check("manual override switches to French voice mid-read", last.startswith("Denise"), last)
+    check("badge marked as manual", shadow(pg, "lang", "e.classList.contains('manual') && e.textContent.startsWith('FR')"))
+    drain(pg)
+
+    pg.click("#cra-host >> css=#gear"); pg.click("#cra-host >> css=#openLangs"); pg.wait_for_timeout(100)
+    rows = shadow(pg, "langRows", "[...e.querySelectorAll('.lrow span')].map(x => x.textContent)")
+    check("sub-page lists detected languages", {"English", "French", "Irish"} <= set(rows), rows)
+    check("main settings hidden while in sub-page", shadow(pg, "mainView", "e.hidden"))
+    pg.screenshot(path=str(OUT / "voices-per-language.png"))
+    # pin Colm for Irish, then read again
+    pg.evaluate("""() => { const sr = document.getElementById('cra-host').shadowRoot;
+        const row = [...sr.querySelectorAll('#langRows .lrow')].find(r => r.querySelector('span').textContent === 'Irish');
+        const sel = row.querySelector('select'); sel.value = 'Microsoft Colm Online (Natural) - Irish (Ireland)'; sel.dispatchEvent(new Event('change')); }""")
+    pg.click("#cra-host >> css=#close")
+    click_heading(pg, "h1")
+    log = drain(pg)
+    check("pinned Irish narrator is used", any(l.startswith("Colm") for l in log) and not any(l.startswith("Orla") for l in log), log)
+    pg.close()
+
     b.close()
 
 print(f"\n{'All tests passed' if not failures else f'{failures} test(s) failed'}")

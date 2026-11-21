@@ -70,15 +70,21 @@ Each sentence is just `{unit, start, end}`. No text is copied until it's spoken.
 `assignLangs(units)` runs once per `play()`:
 
 1. Detect the language of the whole scope with `chrome.i18n.detectLanguage` (Chromium's CLD). Accept it if `isReliable` or ≥ 70 %.
-2. Otherwise fall back to a stop-word and accent score for French vs English (`heuristicLang`).
+2. Otherwise fall back to a stop-word score for French, English and Irish (`heuristicLang`). The winner needs at least two hits and a 20 % lead. Word boundaries use Unicode lookarounds (`(?<!\p{L})…(?!\p{L})`), because JavaScript's `\b` is ASCII-only and fails on words like *tá* or *où*.
 3. Otherwise use the nearest `lang` attribute, then `"en"`. The attribute comes last because claude.ai always declares `lang="en"`, even for French replies.
 4. Every unit of 100+ characters is detected on its own, so a mixed page switches voice per paragraph. Shorter units inherit the scope language, because detection on a few words is unreliable.
 
+**Manual override.** The language badge in the player sets `P.langOverride`, which replaces every unit's detected language for the rest of the current reading. The sentence restarts from the current word with the new narrator. *Always use on this site* stores it in `siteLang[hostname]`. Later readings on that site then skip detection and start with the override, and the badge shows the forced language in orange even when idle. Previews ignore site overrides.
+
+Every detected or chosen language is added to `seenLangs`. That list feeds the badge menu's *Recent* section and the *Voices per language* sub-page.
+
 `voiceFor(lang)`:
 
-- Default voice if it already matches the language, or if it's a **Multilingual** voice, which handles every language itself.
-- For `fr`: the pinned French voice if set.
-- Otherwise `bestVoice(lang)`: score = Natural (+4), preferred region (fr-FR; en-US/GB/IE) (+2), Denise or Henri for French (+1), Multilingual (−0.5).
+1. The narrator pinned for that language in *Voices per language* (`voiceByLang[lang]`).
+2. The default voice if it already matches the language, or if it's a **Multilingual** voice, which handles every language itself.
+3. Otherwise `bestVoice(lang)`: score = Natural (+4), preferred region (fr-FR; en-US/GB/IE) (+2), Denise or Henri for French (+1), Multilingual (−0.5).
+
+Settings from v2.3 migrate automatically: `voiceFr` becomes `voiceByLang.fr`.
 
 ## 5. Speaking — `speakCurrent(fromRel)`
 

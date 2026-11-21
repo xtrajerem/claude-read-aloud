@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Claude Read Aloud",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Reads Claude's replies (or any selected text) aloud with live sentence and word highlighting.",
   "permissions": [
     "storage",

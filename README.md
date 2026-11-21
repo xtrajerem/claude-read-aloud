@@ -16,10 +16,14 @@ It uses the browser's own speech engine. It never calls Claude or any other AI, 
 | **Live highlighting** | The sentence gets a soft tint and the current word gets a solid box. Colours are chosen automatically to contrast with each block's background (WCAG 4.5:1), or set manually. |
 | **Player bar** | ⏮ / ⏭ move by sentence *within the current scope* (section, reply or selection). ⏸ resumes from the current word. Speed control, settings ⚙. |
 | **Speed** | Presets from 0.75× to 3× plus a fine slider. Changes apply mid-sentence. |
-| **Language detection** | Each section, and each long paragraph, is language-detected. French goes to a French (France) voice, English to your default voice, and other languages to the best Natural voice available. Shows an **EN / FR** badge while reading. |
+| **Language detection** | Each section, and each long paragraph, is language-detected (works for Irish too). Each language uses its own narrator. |
+| **Language badge** | While reading, the bar shows the language (**EN ▾**, **GA ▾**…). Click it to correct a wrong detection mid-read; tick *Always use on this site* to force it for the site. Manual choices show in orange. |
+| **Voices per language** | ⚙ → *Voices per language ›* opens a sub-page with one narrator picker (plus preview) per detected language, an *Add a language* list, and the sites you've forced a language on. |
 | **Page chrome skipped** | Menus, site headers, footers, sidebars, forms and editable areas never get buttons and are never read. Code blocks are skipped (optional). |
 | **Shortcuts** | `⌥⇧R` / `Alt+Shift+R` play/pause, `⌥⇧S` / `Alt+Shift+S` stop, `Esc` stop. Right-click → **Read aloud**. |
 | **Per-site off switch** | From the toolbar popup or the settings panel. |
+
+<p><img src="docs/images/language-menu.png" width="49%"> <img src="docs/images/voices-per-language.png" width="49%"></p>
 
 ## Install (unpacked)
 
@@ -38,14 +42,14 @@ To build a zip: `scripts/package.sh` writes `dist/claude-read-aloud-<version>.zi
 Microsoft Edge exposes Microsoft's **Online (Natural)** neural voices to web pages, which sound far better than the local OS voices:
 
 - English default: *Microsoft Christopher Online (Natural)*. It's the extension's default when present.
-- French: *Denise* or *Henri Online (Natural) – French (France)*. Picked automatically, or pin one in ⚙ → French voice.
+- French: *Denise* or *Henri Online (Natural) – French (France)*. Irish: *Orla* or *Colm Online (Natural)*. Picked automatically, or pin one in ⚙ → Voices per language.
 - *Multilingual* voices (e.g. Remy, Vivienne): if set as the default, they're kept for every language.
 
 Chrome offers Google network voices instead. They don't report word positions, so word highlighting uses a timing estimate (see [How it works](docs/HOW-IT-WORKS.md#word-tracking)).
 
 ## Settings (⚙ in the player bar)
 
-Voice, French voice, auto language detection · speed presets and slider · pitch · sentence and word highlight on/off · auto-contrast or manual colours (sentence colour and opacity, word background and text) with a live preview · scroll to follow along · heading buttons on/off and on all websites · per-site enable · auto-read Claude replies · skip code blocks · reset.
+Default voice, auto language detection, *Voices per language* sub-page · speed presets and slider · pitch · sentence and word highlight on/off · auto-contrast or manual colours (sentence colour and opacity, word background and text) with a live preview · scroll to follow along · heading buttons on/off and on all websites · per-site enable · auto-read Claude replies · skip code blocks · reset.
 
 Settings are stored in `chrome.storage.local`, shared across tabs, and not synced.
 
@@ -70,7 +74,7 @@ pip install playwright && python -m playwright install chromium
 python tests/test_extension.py
 ```
 
-They cover section scoping (H1 / H2 / H3), page-chrome exclusion, selection-button persistence, sentence splitting, code skipping, highlight registration and FR/EN voice switching.
+They cover section scoping (H1 / H2 / H3), page-chrome exclusion, selection-button persistence, sentence splitting, code skipping, highlight registration, FR/EN/GA voice switching, the language-badge override and per-language narrators.
 
 ## Known limitations
 

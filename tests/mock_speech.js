@@ -9,6 +9,8 @@ const voices = [
   V("Microsoft Henri Online (Natural) - French (France)", "fr-FR"),
   V("Microsoft Sylvie Online (Natural) - French (Canada)", "fr-CA"),
   V("Microsoft Katja Online (Natural) - German (Germany)", "de-DE"),
+  V("Microsoft Orla Online (Natural) - Irish (Ireland)", "ga-IE"),
+  V("Microsoft Colm Online (Natural) - Irish (Ireland)", "ga-IE"),
 ];
 window.chrome = {
   storage: { local: { get: (d, cb) => cb(d), set: () => {} }, onChanged: { addListener() {} } },

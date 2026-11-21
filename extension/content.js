@@ -10,7 +10,7 @@
   const MAX_LEN = 240; // long sentences are split so voices don't cut off
 
   const DEFAULTS = {
-    voice: "", voiceFr: "", autoLang: true, rate: 1, pitch: 1,
+    voice: "", voiceFr: "", voiceByLang: {}, seenLangs: [], siteLang: {}, autoLang: true, rate: 1, pitch: 1,
     hlSentence: true, hlWord: true, autoContrast: true,
     sentenceColor: "#ffd24d", sentenceAlpha: 0.3, wordBg: "#ff9f1c", wordText: "#000000",
     followAlong: true, showBlockButtons: true, blockMode: "block",
@@ -188,16 +188,16 @@
     block.closest(REPLY_SEL) || block.closest("article, main, [role='main']") || document.body;
 
   // ================= language detection =================
+  const W = (words) => new RegExp(`(?<![\\p{L}])(${words})(?![\\p{L}])`, "giu"); // \b is ASCII-only, breaks on "tá", "où"
   const STOP = {
-    fr: /\b(le|la|les|des|du|une|est|et|pour|dans|que|qui|pas|sur|avec|vous|nous|sont|cette|mais|plus|aux|ces|être|été|où|très|aussi)\b/gi,
-    en: /\b(the|and|is|are|of|to|in|that|for|with|this|you|was|not|on|be|it|have|from|which|will|can|an|or|by|they)\b/gi,
+    fr: W("le|la|les|des|du|une|est|et|pour|dans|que|qui|pas|sur|avec|vous|nous|sont|cette|mais|plus|aux|ces|être|été|où|très|aussi"),
+    en: W("the|and|is|are|of|to|in|that|for|with|this|you|was|not|on|be|it|have|from|which|will|can|or|by|they"),
+    ga: W("agus|tá|bhí|níl|atá|freisin|chun|nach|agam|bhfuil|dtí|ach|leis|sé|sí|mé|tú|seo|ar|ag|leat|orm|dom|anseo|inniu|conas|cén"),
   };
+  // Fallback when the browser detector is unavailable or unsure: highest stop-word score wins by a margin.
   function heuristicLang(t) {
-    const fr = (t.match(STOP.fr) || []).length + 0.5 * (t.match(/[éèêàçùûôœ]/gi) || []).length;
-    const en = (t.match(STOP.en) || []).length;
-    if (fr >= 2 && fr > en * 1.2) return "fr";
-    if (en >= 2 && en > fr * 1.2) return "en";
-    return null;
+    const sc = Object.entries(STOP).map(([l, re]) => [l, (t.match(re) || []).length]).sort((a, b) => b[1] - a[1]);
+    return sc[0][1] >= 2 && sc[0][1] > sc[1][1] * 1.2 ? sc[0][0] : null;
   }
   // Browser's built-in language detector (CLD), with a stop-word fallback for short or unclear text.
   function detectLang(text) {
@@ -224,6 +224,19 @@
     }
   }
   const SKIPPED = { en: "Code block skipped.", fr: "Bloc de code ignoré." };
+  const LN = new Intl.DisplayNames(["en"], { type: "language" });
+  const langName = (c) => { try { return LN.of(c) || c; } catch { return c; } };
+  const SAMPLE = {
+    en: "Hello, this is how I sound.", fr: "Bonjour, voici ma voix.", ga: "Dia duit, seo é mo ghuth.",
+    de: "Hallo, so klingt meine Stimme.", es: "Hola, así suena mi voz.", it: "Ciao, questa è la mia voce.",
+    pt: "Olá, esta é a minha voz.", nl: "Hallo, zo klinkt mijn stem.",
+  };
+  const sampleText = (l) => SAMPLE[l] || (() => { try { return new Intl.DisplayNames([l], { type: "language" }).of(l); } catch { return l; } })();
+  function addSeen(langs) {
+    const seen = S.seenLangs || [];
+    const add = langs.filter((l) => l && !seen.includes(l));
+    if (add.length) save({ seenLangs: [...seen, ...add].slice(-20) });
+  }
 
   const replies = () => [...document.querySelectorAll(REPLY_SEL)].filter((el) => el.innerText.trim());
   const lastReply = () => { const r = replies(); return r[r.length - 1]; };
@@ -241,7 +254,20 @@
   .bar button:hover,.panel button:hover{background:#4a4947}
   .bar button.on{background:#c96442}
   .bar button:disabled{opacity:.35;cursor:default}
-  #lang{font-size:11px;font-weight:600;background:#2d4a6b;cursor:default}
+  #lang{font-size:11px;font-weight:600;background:#2d4a6b}
+  #lang:hover{background:#3b5f88}
+  #lang.manual{background:#c96442}
+  .menu{position:fixed;right:16px;bottom:62px;width:250px;max-height:62vh;overflow:auto;background:#262624;color:#e8e6e3;border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.5);padding:8px;font-size:13px}
+  .menu .mh{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#a8a6a1;margin:8px 6px 4px}
+  .menu .it{all:unset;display:block;cursor:pointer;padding:6px 8px;border-radius:8px;width:calc(100% - 16px)}
+  .menu .it:hover{background:#3a3938}
+  .menu .it.on{background:#c96442;color:#fff}
+  .menu label{margin:8px 6px 2px;font-size:12px}
+  .lrow{display:flex;align-items:center;gap:6px;margin:6px 0}
+  .lrow span{width:78px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lrow select{flex:1;min-width:0}
+  .lrow button{padding:5px 8px}
+  .srow{display:flex;justify-content:space-between;align-items:center;margin:4px 0}
   #speed{min-width:38px}
   .float{position:fixed;display:none;cursor:pointer;background:#1f1e1d;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.35);font-size:13px;user-select:none}
   .float:hover{background:#c96442}
@@ -273,23 +299,28 @@
   <button id="play" title="Play / pause (⌥⇧R)">▶</button>
   <button id="stop" title="Stop (Esc)">⏹</button>
   <button id="next" title="Next sentence">⏭</button>
-  <button id="lang" title="Detected language / voice" hidden></button>
+  <button id="lang" title="Language — click to change" hidden></button>
   <button id="speed" title="Speed — click: faster, right-click: slower">1×</button>
   <button id="auto" title="Auto-read new Claude replies">Auto</button>
   <button id="gear" title="Settings">⚙</button>
 </div>
 <div class="panel" id="panel" hidden>
-  <div class="ph"><b>Read Aloud settings</b><button id="close" title="Close">✕</button></div>
+  <div class="ph"><b id="panelTitle">Read Aloud settings</b><button id="close" title="Close">✕</button></div>
+  <div id="langView" hidden>
+    <div class="row" style="margin:0 0 6px"><button id="backMain">‹ Back</button></div>
+    <div class="note">Narrator used for each language. <b>Auto</b> picks the best Natural voice. Languages appear here once they've been detected.</div>
+    <div id="langRows"></div>
+    <h4>Add a language</h4>
+    <select id="addLang"></select>
+    <h4>Sites with a forced language</h4>
+    <div id="siteRows"></div>
+  </div>
+  <div id="mainView">
   <h4>Voice</h4>
   <select id="voice"></select>
   <div class="row"><button id="preview">▶ Preview</button></div>
   <label style="margin-top:10px"><input type="checkbox" id="autoLang"> Auto-detect language and switch voice</label>
-  <div id="langBox">
-    <div class="note" style="margin:6px 0 4px">French voice</div>
-    <select id="voiceFr"></select>
-    <div class="row"><button id="previewFr">▶ Aperçu</button></div>
-    <div class="note">Other languages use the best Natural voice available for them. A “Multilingual” default voice is kept for every language.</div>
-  </div>
+  <div class="row"><button id="openLangs">Voices per language ›</button></div>
   <h4>Speed <span id="rateVal"></span></h4>
   <div class="chips" id="chips"></div>
   <input type="range" id="rate" min="0.5" max="3" step="0.05">
@@ -313,13 +344,15 @@
   <label><input type="checkbox" id="autoRead"> Auto-read new Claude replies</label>
   <label><input type="checkbox" id="skipCode"> Skip code blocks</label>
   <div class="row"><button id="reset">Reset to defaults</button></div>
+  </div>
 </div>
+<div class="menu" id="langMenu" hidden></div>
 <div class="float round" id="blockBtn" title="Read this section">🔊</div>
 <div class="float pill" id="selBtn" title="Read the selection aloud">🔊 Read</div>`;
   document.documentElement.appendChild(host);
   const $ = (id) => sr.getElementById(id);
   const bar = $("bar"), panel = $("panel"), blockBtn = $("blockBtn"), selBtn = $("selBtn");
-  sr.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Escape") openPanel(false); });
+  sr.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Escape") { openPanel(false); openLangMenu(false); } });
   for (const b of [blockBtn, selBtn, bar]) b.addEventListener("mousedown", (e) => e.preventDefault()); // keep selection
 
   SPEEDS.forEach((v) => {
@@ -354,7 +387,7 @@
     if (keys.includes("hlWord") && !S.hlWord && hasHL) CSS.highlights.delete("cra-word");
     if (keys.includes("hlSentence") && S.hlSentence && P.cur) showSentence(P.cur.item, false);
     if (keys.includes("autoRead") && S.autoRead) resetAutoBaseline();
-    if (["rate", "pitch", "voice", "voiceFr", "autoLang"].some((k) => keys.includes(k)) && P.state === "playing") {
+    if (["rate", "pitch", "voice", "voiceByLang", "autoLang"].some((k) => keys.includes(k)) && P.state === "playing") {
       clearTimeout(restartT);
       restartT = setTimeout(restartFromWord, 250);
     }
@@ -368,8 +401,7 @@
     $("pitch").value = S.pitch; $("pitchVal").textContent = (+S.pitch).toFixed(2);
     for (const b of $("chips").children) b.classList.toggle("on", +b.dataset.v === +S.rate);
     for (const k of ["hlSentence", "hlWord", "autoContrast", "followAlong", "showBlockButtons", "blocksEverywhere", "autoRead", "skipCode", "autoLang"]) $(k).checked = !!S[k];
-    $("langBox").classList.toggle("off", !S.autoLang);
-    if ($("voiceFr").options.length) $("voiceFr").value = S.voiceFr;
+    if (!$("langView").hidden) renderLangView();
     $("siteOn").checked = !siteOff(); $("siteName").textContent = SITE;
     if (siteOff() || !S.showBlockButtons) blockBtn.style.display = "none";
     $("sentenceColor").value = S.sentenceColor; $("sentenceAlpha").value = S.sentenceAlpha;
@@ -399,11 +431,16 @@
       + (lang === "fr" && /henri|denise/i.test(v.name) ? 1 : 0) - (/multilingual/i.test(v.name) ? 0.5 : 0);
     return voices.filter((v) => v.lang.toLowerCase().startsWith(lang)).sort((a, b) => score(b) - score(a))[0] || null;
   }
+  const availLangs = () => [...new Set(voices.map((v) => v.lang.split("-")[0].toLowerCase()))]
+    .sort((a, b) => langName(a).localeCompare(langName(b)));
+  const shortName = (n) => n.replace(/^Microsoft /, "").replace(/ Online \(Natural\)/, " (Natural)").replace(/ - .*$/, "");
+  // Narrator for a language: pinned per-language voice > default voice if it fits > best Natural voice.
   function voiceFor(lang) {
     const def = currentVoice();
-    if (!S.autoLang || !lang || !def) return def;
+    if (!lang || !def) return def;
+    const pinned = voices.find((x) => x.name === (S.voiceByLang || {})[lang]);
+    if (pinned) return pinned;
     if (def.lang.toLowerCase().startsWith(lang) || /multilingual/i.test(def.name)) return def;
-    if (lang === "fr") { const v = voices.find((x) => x.name === S.voiceFr); if (v) return v; }
     return bestVoice(lang) || def;
   }
   function loadVoices() {
@@ -416,17 +453,7 @@
       sel.appendChild(o);
     }
     const cv = currentVoice(); if (cv) sel.value = cv.name;
-    const fsel = $("voiceFr"), bf = bestVoice("fr");
-    fsel.textContent = "";
-    const auto = document.createElement("option");
-    auto.value = ""; auto.textContent = "Auto" + (bf ? ` (${bf.name.replace(/^Microsoft /, "").replace(/ - .*$/, "")})` : " (no French voice found)");
-    fsel.appendChild(auto);
-    for (const v of voices.filter((x) => x.lang.toLowerCase().startsWith("fr"))) {
-      const o = document.createElement("option");
-      o.value = v.name; o.textContent = `${v.name.replace(/^Microsoft /, "")} — ${v.lang}`;
-      fsel.appendChild(o);
-    }
-    fsel.value = S.voiceFr;
+    if (!$("langView").hidden) renderLangView();
   }
 
   // ================= player =================
@@ -437,9 +464,15 @@
     const q = units.flatMap(sentencesOf);
     if (!q.length) return;
     const token = ++playToken;
-    if (S.autoLang) await assignLangs(units);
+    const preview = units.some((u) => u.preview);
+    const forced = preview ? null : (S.siteLang || {})[SITE] || null;
+    if (S.autoLang && !forced) {
+      await assignLangs(units);
+      addSeen([...new Set(units.map((u) => u.lang))]);
+    }
     if (token !== playToken) return;
     stop();
+    P.langOverride = forced;
     P.queue = q; P.idx = 0; P.state = "playing"; P.startBlock = startBlock;
     speakCurrent(0);
   }
@@ -450,7 +483,8 @@
     const item = P.queue[P.idx];
     if (!item) return stop();
     const base = item.spoken ? 0 : item.start + fromRel;
-    const lang = item.unit.lang;
+    const lang = P.langOverride || item.unit.lang;
+    P.lang = lang;
     const spoken = item.unit.skipped ? SKIPPED[lang] || SKIPPED.en : item.spoken;
     const text = spoken || item.unit.text.slice(base, item.end);
     P.cur = { item, base, text }; P.lastWord = null; P.sawBoundary = false;
@@ -586,15 +620,107 @@
     play(buildUnits(cont, r), h);
   }
 
+  // ================= language menu (badge) =================
+  function openLangMenu(open) {
+    const m = $("langMenu");
+    m.hidden = !open;
+    if (!open) return;
+    if (panelOpen) openPanel(false);
+    m.textContent = "";
+    const detected = P.cur && P.cur.item.unit.lang;
+    const active = P.state === "idle" ? (S.siteLang || {})[SITE] || null : P.langOverride;
+    const head = (t) => { const d = document.createElement("div"); d.className = "mh"; d.textContent = t; m.appendChild(d); };
+    const item = (code, label) => {
+      const b = document.createElement("button");
+      b.className = "it" + (code === active ? " on" : ""); b.textContent = label;
+      b.onclick = () => setLangOverride(code);
+      m.appendChild(b);
+    };
+    item(null, "Auto" + (detected ? ` — detected ${langName(detected)}` : ""));
+    const avail = availLangs(), seen = (S.seenLangs || []).filter((l) => avail.includes(l));
+    if (seen.length) { head("Recent"); seen.forEach((l) => item(l, langName(l))); }
+    head("All languages");
+    avail.filter((l) => !seen.includes(l)).forEach((l) => item(l, langName(l)));
+    const lab = document.createElement("label");
+    lab.innerHTML = '<input type="checkbox" id="langSite"> ';
+    lab.append(`Always use on ${SITE || "this site"}`);
+    m.insertBefore(lab, m.firstChild);
+    const cb = lab.querySelector("input");
+    cb.checked = !!(S.siteLang || {})[SITE];
+    cb.onchange = () => {
+      const sl = { ...(S.siteLang || {}) };
+      const code = P.langOverride || (P.state === "idle" ? sl[SITE] : P.lang);
+      if (cb.checked && code) sl[SITE] = code; else delete sl[SITE];
+      save({ siteLang: sl });
+    };
+  }
+  function setLangOverride(code) {
+    const keep = !!sr.getElementById("langSite")?.checked;
+    P.langOverride = code;
+    const sl = { ...(S.siteLang || {}) };
+    if (keep && code) sl[SITE] = code; else if (!code || !keep) delete sl[SITE];
+    save({ siteLang: sl });
+    if (code) addSeen([code]);
+    openLangMenu(false);
+    if (P.state === "playing") restartFromWord(); else updateBar();
+  }
+
+  // ================= settings sub-page: voices per language =================
+  function showLangView(on) {
+    $("langView").hidden = !on; $("mainView").hidden = on;
+    $("panelTitle").textContent = on ? "Voices per language" : "Read Aloud settings";
+    if (on) renderLangView();
+  }
+  function renderLangView() {
+    const avail = availLangs();
+    const list = [...new Set(["en", "fr", ...(S.seenLangs || []), ...Object.keys(S.voiceByLang || {})])].filter((l) => avail.includes(l));
+    const rows = $("langRows"); rows.textContent = "";
+    for (const l of list) {
+      const row = document.createElement("div"); row.className = "lrow";
+      const name = document.createElement("span"); name.textContent = langName(l); name.title = langName(l);
+      const sel = document.createElement("select");
+      const best = bestVoice(l), def = currentVoice();
+      const autoV = def && (def.lang.toLowerCase().startsWith(l) || /multilingual/i.test(def.name)) ? def : best;
+      sel.add(new Option(`Auto${autoV ? ` (${shortName(autoV.name)})` : ""}`, ""));
+      for (const v of voices.filter((x) => x.lang.toLowerCase().startsWith(l))) sel.add(new Option(`${shortName(v.name)} — ${v.lang}`, v.name));
+      sel.value = (S.voiceByLang || {})[l] || "";
+      sel.onchange = () => { const mp = { ...(S.voiceByLang || {}) }; if (sel.value) mp[l] = sel.value; else delete mp[l]; save({ voiceByLang: mp }); };
+      const pv = document.createElement("button"); pv.textContent = "▶"; pv.title = "Preview";
+      pv.onclick = () => play([{ spoken: sampleText(l), lang: l, preview: true, owner: document.body }]);
+      row.append(name, sel, pv); rows.appendChild(row);
+    }
+    const add = $("addLang"); add.textContent = "";
+    add.add(new Option("Choose a language…", ""));
+    avail.filter((l) => !list.includes(l)).forEach((l) => add.add(new Option(langName(l), l)));
+    const sites = $("siteRows"); sites.textContent = "";
+    const entries = Object.entries(S.siteLang || {});
+    if (!entries.length) { const n = document.createElement("div"); n.className = "note"; n.textContent = "None. Use the language badge in the player to force one."; sites.appendChild(n); }
+    for (const [host, l] of entries) {
+      const r = document.createElement("div"); r.className = "srow";
+      const t = document.createElement("span"); t.textContent = `${host} → ${langName(l)}`;
+      const x = document.createElement("button"); x.textContent = "✕"; x.title = "Remove";
+      x.onclick = () => { const sl = { ...(S.siteLang || {}) }; delete sl[host]; save({ siteLang: sl }); };
+      r.append(t, x); sites.appendChild(r);
+    }
+  }
+
   // ================= bar & panel =================
   let panelOpen = false, hideBarT = null;
   function updateBar() {
     const idle = P.state === "idle";
     $("play").textContent = P.state === "playing" ? "⏸" : "▶";
     $("prev").disabled = $("next").disabled = $("stop").disabled = idle;
-    const lg = P.cur && P.cur.item.unit.lang;
-    $("lang").hidden = idle || !S.autoLang || !lg;
-    if (lg) { $("lang").textContent = lg.toUpperCase(); $("lang").title = P.voice ? P.voice.name : lg; }
+    const siteForced = (S.siteLang || {})[SITE];
+    const lg = idle ? siteForced : P.lang;
+    $("lang").hidden = !lg || (idle && !siteForced);
+    if (lg) {
+      const manual = idle ? true : !!P.langOverride;
+      $("lang").textContent = lg.toUpperCase() + " ▾";
+      $("lang").classList.toggle("manual", manual);
+      $("lang").title = `${langName(lg)} — ${manual ? (siteForced === lg ? "forced on this site" : "set manually") : "detected"}`
+        + (P.voice && !idle ? `\nVoice: ${shortName(P.voice.name)}` : "") + "\nClick to change";
+    }
+    if (idle) $("langMenu").hidden = true;
     $("auto").hidden = !ON_CLAUDE;
     clearTimeout(hideBarT);
     if (ON_CLAUDE || !idle || panelOpen) bar.hidden = false;
@@ -602,7 +728,7 @@
   }
   function openPanel(open) {
     panelOpen = open; panel.hidden = !open;
-    if (open) { loadVoices(); refreshUI(); }
+    if (open) { $("langMenu").hidden = true; showLangView(false); loadVoices(); refreshUI(); }
     updateBar();
   }
 
@@ -632,10 +758,13 @@
   for (const k of ["sentenceColor", "wordBg", "wordText"]) $(k).addEventListener("input", (e) => save({ [k]: e.target.value }));
   for (const k of ["rate", "pitch", "sentenceAlpha"]) $(k).addEventListener("input", (e) => save({ [k]: +e.target.value }));
   $("voice").addEventListener("change", (e) => save({ voice: e.target.value }));
-  $("voiceFr").addEventListener("change", (e) => save({ voiceFr: e.target.value }));
-  $("preview").onclick = () => play([{ spoken: "Hello. This is how I sound at this speed.", lang: (currentVoice() || { lang: "en" }).lang.slice(0, 2).toLowerCase(), owner: document.body }]);
-  $("previewFr").onclick = () => play([{ spoken: "Bonjour. Voici la voix française à cette vitesse.", lang: "fr", owner: document.body }]);
-  $("reset").onclick = () => save({ ...DEFAULTS, disabledSites: S.disabledSites });
+
+  $("preview").onclick = () => play([{ spoken: "Hello. This is how I sound at this speed.", lang: (currentVoice() || { lang: "en" }).lang.slice(0, 2).toLowerCase(), preview: true, owner: document.body }]);
+  $("openLangs").onclick = () => showLangView(true);
+  $("backMain").onclick = () => showLangView(false);
+  $("lang").onclick = () => openLangMenu($("langMenu").hidden);
+  $("addLang").addEventListener("change", (e) => { if (e.target.value) addSeen([e.target.value]); });
+  $("reset").onclick = () => save({ ...DEFAULTS, disabledSites: S.disabledSites, seenLangs: S.seenLangs });
 
   // ================= section 🔊 buttons on headings (+ whole-reply button on claude.ai) =================
   let hoverTarget = null, hoverKind = null, hideBlockT = null;
@@ -747,6 +876,8 @@
 
   speechSynthesis.addEventListener("voiceschanged", () => { loadVoices(); refreshUI(); });
   loadVoices();
-  chrome.storage.local.get(DEFAULTS, (s) => { S = { ...DEFAULTS, ...s }; refreshUI(); resetAutoBaseline(); });
+  chrome.storage.local.get(DEFAULTS, (s) => {
+    S = { ...DEFAULTS, ...s };
+    if (S.voiceFr && !(S.voiceByLang || {}).fr) save({ voiceByLang: { ...(S.voiceByLang || {}), fr: S.voiceFr }, voiceFr: "" }); refreshUI(); resetAutoBaseline(); });
   refreshUI();
 })();
